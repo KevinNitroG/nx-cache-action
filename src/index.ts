@@ -8,9 +8,13 @@ import { spawn } from 'child_process';
 const app = express();
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
 const CACHE_KEY_PREFIX: string = process.env.CACHE_KEY_PREFIX || 'nx-';
-const CACHE_DIR: string = fs.mkdtempSync(
-  path.join(os.tmpdir(), 'nx-gh-cache-'),
-);
+const RUNNER_ID: string = process.env.GITHUB_RUN_ID || 'default';
+const CACHE_DIR: string = path.join(os.tmpdir(), `nx-gh-cache-${RUNNER_ID}`);
+
+// Create cache directory if it doesn't exist
+if (!fs.existsSync(CACHE_DIR)) {
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
 
 app.get(
   '/v1/cache/:hash',
@@ -35,7 +39,6 @@ app.get(
 
       readStream.pipe(res);
 
-      readStream.on('end', () => fs.unlinkSync(filePath));
       readStream.on('error', (err: Error) => {
         console.error(`[Cache GET] Error streaming file: ${err.message}`);
         if (!res.headersSent) res.status(500).send('Stream error');
@@ -58,11 +61,9 @@ app.put('/v1/cache/:hash', (req: Request, res: Response): void => {
 
   req.pipe(writeStream);
 
-  req.on('end', async () => {
+   req.on('end', async () => {
     try {
       await cache.saveCache([filePath], cacheKey);
-
-      fs.unlinkSync(filePath);
 
       res.status(200).send('Successfully uploaded the output');
     } catch (error: unknown) {
@@ -113,8 +114,6 @@ const server = app.listen(PORT, () => {
       `[Cache Server] Command exited with code ${code}. Shutting down server.`,
     );
     server.close();
-
-    fs.rmSync(CACHE_DIR, { recursive: true, force: true });
 
     process.exit(code ?? 1);
   });
