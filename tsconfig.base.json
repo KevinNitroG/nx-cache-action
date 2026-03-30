@@ -1,0 +1,14 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": "./src",
+    "target": "esnext",
+    "module": "nodenext",
+    "lib": ["esnext"],
+    "skipLibCheck": true,
+    "paths": {
+      "*": ["./*"]
+    }
+  },
+  "include": ["src/**/*"]
+}
