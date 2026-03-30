@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 
 const app = express();
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
+const SKIP_UPLOAD_CACHE: boolean = process.env.SKIP_UPLOAD_CACHE === 'true';
 const CACHE_KEY_PREFIX: string = process.env.CACHE_KEY_PREFIX || 'nx-';
 const RUNNER_ID: string = process.env.GITHUB_RUN_ID || 'default';
 const CACHE_DIR: string = path.join(os.tmpdir(), `nx-gh-cache-${RUNNER_ID}`);
@@ -53,6 +54,13 @@ app.get(
 );
 
 app.put('/v1/cache/:hash', (req: Request, res: Response): void => {
+  if (SKIP_UPLOAD_CACHE) {
+    console.log(
+      '[Cache PUT] Skipping cache upload due to SKIP_UPLOAD_CACHE=true',
+    );
+    res.status(200).send('Cache upload skipped');
+    return;
+  }
   const hash = req.params.hash as string;
   const cacheKey: string = `${CACHE_KEY_PREFIX}${hash}`;
   const filePath: string = path.join(CACHE_DIR, `${hash}.bin`);
@@ -61,7 +69,7 @@ app.put('/v1/cache/:hash', (req: Request, res: Response): void => {
 
   req.pipe(writeStream);
 
-   req.on('end', async () => {
+  req.on('end', async () => {
     try {
       await cache.saveCache([filePath], cacheKey);
 
