@@ -1,128 +1,120 @@
-import express, { type Request, type Response } from 'express';
-import * as cache from '@actions/cache';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+#!/usr/bin/env node
 import { spawn } from 'child_process';
+import * as core from '@actions/core';
+import minimist from 'minimist';
+import { createServer, getServerConfig } from './server.js';
 
-const app = express();
-const PORT: number = parseInt(process.env.PORT || '3000', 10);
-const SKIP_UPLOAD_CACHE: boolean = process.env.SKIP_UPLOAD_CACHE === 'true';
-const CACHE_KEY_PREFIX: string = process.env.CACHE_KEY_PREFIX || 'nx-';
-const RUNNER_ID: string = process.env.GITHUB_RUN_ID || 'default';
-const CACHE_DIR: string = path.join(os.tmpdir(), `nx-gh-cache-${RUNNER_ID}`);
+function printUsage(): void {
+  const usage = `
+Usage: pnpm dlx @kevinnitro/nx-cache-action [options] -- <command> [args...]
 
-// Create cache directory if it doesn't exist
-if (!fs.existsSync(CACHE_DIR)) {
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
+Description:
+  Proxy server for GitHub Actions cache to use with Nx remote cache.
+  This tool starts a local cache server and executes the provided command
+  with the NX_SELF_HOSTED_REMOTE_CACHE_SERVER environment variable set.
+
+Options:
+  --help, -h                    Show this help message
+  --no-cleanup-cache            Disable automatic cleanup of cache files after operation
+
+Environment Variables:
+  NX_CACHE_ACTION_PORT                  Port for the cache server (default: 3000)
+  NX_CACHE_ACTION_SKIP_UPLOAD_CACHE     Skip cache uploads if set to 'true'
+  NX_CACHE_ACTION_CACHE_KEY_PREFIX      Prefix for cache keys (default: 'nx-')
+  NX_CACHE_ACTION_CLEANUP_CACHE         Set to 'false' to disable cleanup (default: 'true')
+  RUNNER_ID                             Runner ID for cache directory naming (default: 'default')
+
+Examples:
+  pnpm dlx @kevinnitro/nx-cache-action -- pnpm exec nx build my-app
+  pnpm dlx @kevinnitro/nx-cache-action -- pnpm exec nx run-many -t build test
+  NX_CACHE_ACTION_PORT=4000 pnpm dlx @kevinnitro/nx-cache-action -- nx build
+  pnpm dlx @kevinnitro/nx-cache-action --no-cleanup-cache -- nx build
+  NX_CACHE_ACTION_CLEANUP_CACHE=false pnpm dlx @kevinnitro/nx-cache-action -- nx build
+`;
+  core.info(usage);
 }
 
-app.get(
-  '/v1/cache/:hash',
-  async (req: Request, res: Response): Promise<void> => {
-    const hash = req.params.hash as string;
-    const cacheKey: string = `${CACHE_KEY_PREFIX}${hash}`;
-    const filePath: string = path.join(CACHE_DIR, `${hash}.bin`);
-
-    try {
-      const restoredKey: string | undefined = await cache.restoreCache(
-        [filePath],
-        cacheKey,
-      );
-
-      if (!restoredKey) {
-        res.status(404).send('Cache artifact not found');
-        return;
-      }
-
-      res.setHeader('Content-Type', 'application/octet-stream');
-      const readStream = fs.createReadStream(filePath);
-
-      readStream.pipe(res);
-
-      readStream.on('error', (err: Error) => {
-        console.error(`[Cache GET] Error streaming file: ${err.message}`);
-        if (!res.headersSent) res.status(500).send('Stream error');
-      });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`[Cache GET] Error: ${errorMessage}`);
-      res.status(500).send(errorMessage);
+function stripActionsEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const cleanEnv: NodeJS.ProcessEnv = {};
+  for (const key in env) {
+    if (!key.startsWith('ACTIONS_')) {
+      cleanEnv[key] = env[key];
     }
-  },
-);
-
-app.put('/v1/cache/:hash', (req: Request, res: Response): void => {
-  if (SKIP_UPLOAD_CACHE) {
-    console.log(
-      '[Cache PUT] Skipping cache upload due to SKIP_UPLOAD_CACHE=true',
-    );
-    res.status(200).send('Cache upload skipped');
-    return;
   }
-  const hash = req.params.hash as string;
-  const cacheKey: string = `${CACHE_KEY_PREFIX}${hash}`;
-  const filePath: string = path.join(CACHE_DIR, `${hash}.bin`);
+  return cleanEnv;
+}
 
-  const writeStream = fs.createWriteStream(filePath);
-
-  req.pipe(writeStream);
-
-  req.on('end', async () => {
-    try {
-      await cache.saveCache([filePath], cacheKey);
-
-      res.status(200).send('Successfully uploaded the output');
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`[Cache PUT] Error saving cache: ${errorMessage}`);
-      res.status(500).send(errorMessage);
-    }
+function main(): void {
+  const argv = minimist(process.argv.slice(2), {
+    boolean: ['help', 'no-cleanup-cache'],
+    alias: { h: 'help' },
+    '--': true,
   });
 
-  req.on('error', (err: Error) => {
-    console.error(`[Cache PUT] Request stream error: ${err.message}`);
-    res.status(500).send('Stream error');
-  });
-});
+  if (argv.help) {
+    printUsage();
+    process.exit(0);
+  }
 
-const server = app.listen(PORT, () => {
-  console.log(`[Cache Server] Running on http://localhost:${PORT}`);
+  if (argv['no-cleanup-cache']) {
+    process.env.NX_CACHE_ACTION_CLEANUP_CACHE = 'false';
+  }
 
-  const args: string[] = process.argv.slice(2);
-  if (args.length === 0) {
-    console.error(
-      'No command provided. Usage: pnpm dlx @kevinnitro/nx-cache-action <normal nx command>',
-      'e.g., pnpm dlx @kevinnitro/nx-cache-action pnpm exec nx build my-app',
-    );
-    server.close();
+  const command = argv['--'];
+
+  if (!command || command.length === 0) {
+    core.error('No command provided after --');
+    printUsage();
     process.exit(1);
   }
 
-  const [command, ...commandArgs] = args;
+  const [cmd, ...cmdArgs] = command;
 
-  if (!command) {
-    console.error('No command provided. Exiting.');
-    server.close();
+  if (!cmd) {
+    core.error('Invalid command');
+    printUsage();
     process.exit(1);
   }
-  const child = spawn(command, commandArgs, {
+
+  const config = getServerConfig();
+  const server = createServer(config);
+
+  const cleanEnv = stripActionsEnv(process.env);
+
+  const child = spawn(cmd, cmdArgs, {
     env: {
-      ...process.env,
-      NX_SELF_HOSTED_REMOTE_CACHE_SERVER: `http://localhost:${PORT}`,
+      ...cleanEnv,
+      NX_SELF_HOSTED_REMOTE_CACHE_SERVER: `http://localhost:${config.port}`,
     },
     stdio: 'inherit',
     shell: true,
   });
 
   child.on('close', (code: number | null) => {
-    console.log(
-      `[Cache Server] Command exited with code ${code}. Shutting down server.`,
-    );
+    core.info(`Command exited with code ${code ?? 1}. Shutting down server.`);
     server.close();
-
     process.exit(code ?? 1);
   });
-});
+
+  child.on('error', (err: Error) => {
+    core.error(`Failed to start command: ${err.message}`);
+    server.close();
+    process.exit(1);
+  });
+
+  process.on('SIGINT', () => {
+    core.warning('Received SIGINT, shutting down...');
+    child.kill('SIGINT');
+    server.close();
+    process.exit(130);
+  });
+
+  process.on('SIGTERM', () => {
+    core.warning('Received SIGTERM, shutting down...');
+    child.kill('SIGTERM');
+    server.close();
+    process.exit(143);
+  });
+}
+
+main();

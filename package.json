@@ -1,9 +1,11 @@
 {
   "name": "@kevinnitro/nx-cache-action",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
-  "bin": "dist/index.js",
+  "bin": {
+    "nx-cache-action": "dist/index.js"
+  },
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "build": "tsgo"
@@ -13,10 +15,18 @@
   ],
   "dependencies": {
     "@actions/cache": "^6.0.0",
-    "express": "^5.2.1"
+    "@actions/core": "^3.0.0",
+    "express": "^5.2.1",
+    "minimist": "^1.2.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/minimist": "^1.2.5",
     "@types/node": "^25.5.0"
+  },
+  "homepage": "https://github.com/KevinNitroG/nx-cache-action",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KevinNitroG/nx-cache-action.git"
   }
 }

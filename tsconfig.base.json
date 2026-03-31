@@ -2,9 +2,9 @@
   "compileOnSave": false,
   "compilerOptions": {
     "rootDir": "./src",
-    "target": "esnext",
-    "module": "nodenext",
-    "lib": ["esnext"],
+    "target": "es2015",
+    "module": "es2015",
+    "lib": ["es2015"],
     "skipLibCheck": true,
     "paths": {
       "*": ["./*"]
