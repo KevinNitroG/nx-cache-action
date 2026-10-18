@@ -9,26 +9,26 @@ importers:
   .:
     dependencies:
       '@actions/cache':
-        specifier: ^6.0.0
+        specifier: '>=6.0.0'
         version: 6.0.0
       '@actions/core':
-        specifier: ^3.0.0
+        specifier: '>=3.0.0'
         version: 3.0.0
       express:
-        specifier: ^5.2.1
+        specifier: '>=5.0.0'
         version: 5.2.1
       minimist:
-        specifier: ^1.2.8
+        specifier: '>=1.0.0'
         version: 1.2.8
     devDependencies:
       '@types/express':
-        specifier: ^5.0.6
+        specifier: '>=5.0.0'
         version: 5.0.6
       '@types/minimist':
-        specifier: ^1.2.5
+        specifier: '>=1.0.0'
         version: 1.2.5
       '@types/node':
-        specifier: ^25.5.0
+        specifier: '>=25.5.0'
         version: 25.5.0
 
 packages:
@@ -164,8 +164,8 @@ packages:
     resolution: {integrity: sha512-oP5VkATKlNwcgvxi0vM0p/D3n2C3EReYVX+DNYs5TjZFn/oQt2j+4sVJtSMr18pdRr8wjTcBl6LoV+FUwzPmNA==}
     engines: {node: '>=18'}
 
-  brace-expansion@1.1.13:
-    resolution: {integrity: sha512-9ZLprWS6EENmhEOpjCYW2c8VkmOvckIJZfkr7rBW6dObmfgJ/L1GpSYW5Hpo9lDz4D1+n0Ckz8rU7FwHDQiG/w==}
+  brace-expansion@1.1.21:
+    resolution: {integrity: sha512-9zeA+KLZNNzglF2TPKRQEDyx6Yby7daAkuy8MiPzpXPsYDWi/DRM8jmwUDxokQjYqBpv5DgPiwD4h4ZZSy1Ujw==}
 
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
@@ -697,7 +697,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  brace-expansion@1.1.13:
+  brace-expansion@1.1.21:
     dependencies:
       balanced-match: 1.0.2
       concat-map: 0.0.1
@@ -886,7 +886,7 @@ snapshots:
 
   minimatch@3.1.5:
     dependencies:
-      brace-expansion: 1.1.13
+      brace-expansion: 1.1.21
 
   minimist@1.2.8: {}
 
